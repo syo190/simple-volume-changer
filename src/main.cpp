@@ -5,6 +5,7 @@
 #include<windows.h>
 #include<mmsystem.h>
 #include<endpointvolume.h>
+#include<cmath>
 
 #include"..\inc\Slider.h"
 #include"..\inc\ID.h"
@@ -43,7 +44,6 @@ int WINAPI WinMain(
 	HWND hwnd = CreateWindowEx(
 		0, // optional window style
 		ClassName, WindowText,
-// 		WS_OVERLAPPEDWINDOW | WS_VISIBLE, //window style
 		WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_MINIMIZEBOX,
 		CW_USEDEFAULT, CW_USEDEFAULT, MainWindowWidth, MainWindowHeight,
 		NULL, // parent window
@@ -81,7 +81,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			return 0;
 		}
 		case WM_UPDATE_VOLUME:{
-			// 音量の変更を行う
+			// 音量の更新を行うメッセージ
 			// wparamには変更後の音量が格納されている
 			float normalizedVolume = float(wParam) / float(SliderMaxVal - SliderMinVal);
 			sc.SetChannelVolume(normalizedVolume, 1);
@@ -94,21 +94,27 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			break;
 		}
 		case WM_HSCROLL:{
-			int volume = HIWORD(wParam);
-			SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(volume), LPARAM(NULL));
-			break;
-		}
-		case WM_TIMER:{
 			int nowVolume = SendMessage(
 				GetDlgItem(hwnd, IDC_SLIDER), TBM_GETPOS, WPARAM(NULL), LPARAM(NULL)
 			);
+			SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(nowVolume), LPARAM(NULL));
+			break;
+		}
+		case WM_TIMER:{
+			if(!GetAsyncKeyState(VK_CONTROL)) break;
 			int upDown = 0;
 			if(GetAsyncKeyState(VK_F8) & 0x01) upDown = -1;
 			else if(GetAsyncKeyState(VK_F9) & 0x01) upDown = 1;
-			SendMessage(
-				GetDlgItem(hwnd, IDC_SLIDER), TBM_SETPOS, WPARAM(1), LPARAM(nowVolume + upDown)
+			
+			int nowVolume = SendMessage(
+				GetDlgItem(hwnd, IDC_SLIDER), TBM_GETPOS, WPARAM(NULL), LPARAM(NULL)
 			);
-			if(upDown != 0) SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(nowVolume + upDown), LPARAM(NULL));
+			int newVolume = nowVolume;
+			if(nowVolume + upDown >= SliderMinVal && nowVolume + upDown <= SliderMaxVal) newVolume += upDown; 
+			SendMessage(
+				GetDlgItem(hwnd, IDC_SLIDER), TBM_SETPOS, WPARAM(1), LPARAM(newVolume)
+			);
+			SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(newVolume), LPARAM(NULL));
 			break;
 		}
 		case WM_CREATE:{
@@ -118,7 +124,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			);
 			SendMessage(
 				slider.GetHandler(), TBM_SETRANGE, WPARAM(true), MAKELPARAM(SliderMinVal, SliderMaxVal)
-			);	
+			);
+			float normalizedVolume = sc.GetChannelNormalizedVolume(1);
+			int volume = static_cast<int>(std::floor(normalizedVolume * (SliderMaxVal - SliderMinVal)));
+			SendMessage(
+				GetDlgItem(hwnd, IDC_SLIDER), TBM_SETPOS, WPARAM(1), LPARAM(volume)
+			);
 
 			SetTimer(hwnd, IDT_ACCEPT_INPUT, AcceptInputInterval, TIMERPROC(NULL));
 			break;

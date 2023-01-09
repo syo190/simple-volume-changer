@@ -3,18 +3,17 @@
 #include<propvarutil.h>
 
 /*
-１．
-アプリケーションを立ち上げたときに現在の音量を調べて、
-それをスライダー位置に反映する必要がある
-
 ２．
-ショートカットの選択肢を与える
+常駐にしてショートカットの選択肢を与える
 
 ３．
 デバイス名のラベルを付与する
 
 ４．
 デバイス数に応じてウィンドウサイズを変更して開く
+
+５．
+ショートカットキーを選択できるようにする
 */
 
 SoundControler::SoundControler(): m_ChannelCnt(0){
@@ -68,6 +67,16 @@ BOOL SoundControler::SetChannelVolume(float normalizedVol, UINT ch){
     if(normalizedVol > 1.0f - Delta) normalizedVol = 1.0f;
     auto result = this->m_aepVolume[ch]->SetMasterVolumeLevelScalar(normalizedVol, NULL);
     return result == S_OK;
+}
+
+
+// 成功すれば正規化された音量を返す, 失敗すれば0を返す
+float SoundControler::GetChannelNormalizedVolume(UINT ch) const{
+    if(ch >= this->ChanngelCount()) return 0.0f;
+
+    float normalizedVolume;
+    this->m_aepVolume[ch]->GetMasterVolumeLevelScalar(&normalizedVolume);
+    return normalizedVolume;
 }
 
 // デバイスの名前を返す。存在しないchの場合は空文字を返す

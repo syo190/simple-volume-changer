@@ -15,6 +15,7 @@ public:
 
     BOOL SetChannelVolume(float normalizedVol, UINT ch);
     
+    float GetChannelNormalizedVolume(UINT ch) const;
     CString DeviceName(UINT ch) const;
     UINT ChanngelCount() const;
 };
