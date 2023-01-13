@@ -36,7 +36,7 @@ SoundControler::SoundControler(): m_ChannelCnt(0){
     result = pMMDeviceCollection->GetCount(&this->m_ChannelCnt);
     this->m_aepVolume.resize(this->m_ChannelCnt);
     this->m_DeviceInfo.resize(this->m_ChannelCnt);
-    for(int i = 0; i < this->m_ChannelCnt; ++i){
+    for(std::size_t i = 0; i < this->m_ChannelCnt; ++i){
         CComPtr<IMMDevice> pMMDevice;
         result = pMMDeviceCollection->Item(i, &pMMDevice);
         result = pMMDevice->Activate(

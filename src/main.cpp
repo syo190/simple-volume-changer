@@ -10,6 +10,7 @@
 #include"..\inc\Slider.h"
 #include"..\inc\ID.h"
 #include"..\inc\SoundControler.h"
+#include"..\inc\TaskTray.h"
 
 namespace{
 	const LPCWSTR ClassName = TEXT("VolumeChanger");
@@ -56,6 +57,8 @@ int WINAPI WinMain(
 		MessageBox(NULL, TEXT("Something wrong"), TEXT("Error"), MB_OK);
 		return -1;
 	}
+
+	TaskTray tk(hInstance, hwnd, IDI_TASK_TRAY, WM_TASK_TRAY_CLIKED);
 
 	// run message loop
     MSG msg = {};
@@ -117,7 +120,42 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(newVolume), LPARAM(NULL));
 			break;
 		}
+		case WM_TASK_TRAY_CLIKED:{
+			auto id = (UINT)(lParam);
+			if(id == WM_LBUTTONUP){
+				int a = 43;
+			}
+			else if(id == WM_RBUTTONUP){
+				POINT pt = {0};
+				GetCursorPos(&pt);
+
+				SetForegroundWindow(hwnd);
+				HMENU hMenu = CreatePopupMenu();
+				InsertMenu(
+					hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_OPEN_FROM_TASK_TRAY, _T("VoiceChanger") 
+				);
+				InsertMenu(
+					hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_CLOSE_FROM_TASK_TRAY, _T("close") 
+				);
+				auto clikedID = TrackPopupMenu(
+					hMenu,
+					TPM_LEFTALIGN | TPM_BOTTOMALIGN | TPM_RETURNCMD | TPM_RIGHTBUTTON,
+					pt.x, pt.y, 0,
+					hwnd, NULL
+				);
+				PostMessage(hwnd, WM_NULL, WPARAM(NULL), LPARAM(NULL));
+
+				if(clikedID == IDM_CLOSE_FROM_TASK_TRAY){
+					SendMessage(hwnd, WM_CLOSE, WPARAM(NULL), LPARAM(NULL));
+				}else if(clikedID == IDM_OPEN_FROM_TASK_TRAY){
+					int s = 0;
+				}
+			}
+			break;
+		}
 		case WM_CREATE:{
+
+
 			Slider slider(
 				hwnd, (LPCREATESTRUCT(lParam))->hInstance,
 				BlankSpace, BlankSpace, SliderWidth, SliderHeight, IDC_SLIDER

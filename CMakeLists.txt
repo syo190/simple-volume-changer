@@ -8,6 +8,7 @@ add_executable(
     src/main.cpp
     src/Slider.cpp
     src/SoundControler.cpp
+    src/TaskTray.cpp
 )
 
 
