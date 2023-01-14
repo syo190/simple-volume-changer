@@ -17,5 +17,5 @@ public:
     
     float GetChannelNormalizedVolume(UINT ch) const;
     CString DeviceName(UINT ch) const;
-    UINT ChanngelCount() const;
+    UINT ChannelCount() const;
 };

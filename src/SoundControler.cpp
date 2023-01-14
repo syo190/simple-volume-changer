@@ -1,11 +1,12 @@
-﻿#include"..\inc\SoundControler.h"
+﻿#ifndef UNICODE
+#define UNICODE
+#endif
+
+#include"..\inc\SoundControler.h"
 #include<Functiondiscoverykeys_devpkey.h>
 #include<propvarutil.h>
 
 /*
-２．
-常駐にしてショートカットの選択肢を与える
-
 ３．
 デバイス名のラベルを付与する
 
@@ -47,9 +48,8 @@ SoundControler::SoundControler(): m_ChannelCnt(0){
         );
         CComPtr<IPropertyStore> pPropStore;
         result = pMMDevice->OpenPropertyStore(STGM_READ, &pPropStore);
-        PROPVARIANT propMMDevice;
-        PropVariantInit(&propMMDevice);
-        result = pPropStore->GetValue(PKEY_Device_FriendlyName, &propMMDevice);
+        PropVariantInit(&this->m_DeviceInfo[i]);
+        result = pPropStore->GetValue(PKEY_Device_FriendlyName, &this->m_DeviceInfo[i]);
     }
 };
 
@@ -60,7 +60,7 @@ SoundControler::~SoundControler(){
 
 // 成功すればTRUE, 失敗すればFALSEを返す
 BOOL SoundControler::SetChannelVolume(float normalizedVol, UINT ch){
-    if(ch >= this->ChanngelCount()) return FALSE;
+    if(ch >= this->ChannelCount()) return FALSE;
 
     static const float Delta = 1e-10f;
     if(normalizedVol < Delta) normalizedVol = 0.0f;
@@ -72,7 +72,7 @@ BOOL SoundControler::SetChannelVolume(float normalizedVol, UINT ch){
 
 // 成功すれば正規化された音量を返す, 失敗すれば0を返す
 float SoundControler::GetChannelNormalizedVolume(UINT ch) const{
-    if(ch >= this->ChanngelCount()) return 0.0f;
+    if(ch >= this->ChannelCount()) return 0.0f;
 
     float normalizedVolume;
     this->m_aepVolume[ch]->GetMasterVolumeLevelScalar(&normalizedVolume);
@@ -81,14 +81,14 @@ float SoundControler::GetChannelNormalizedVolume(UINT ch) const{
 
 // デバイスの名前を返す。存在しないchの場合は空文字を返す
 CString SoundControler::DeviceName(UINT ch) const{
-    if(ch >= this->ChanngelCount()) return CString(L"");
+    if(ch >= this->ChannelCount()) return CString(L"");
     
     static const int BufSize = 256;
-    WCHAR deviceName[BufSize] = {0};
-    PropVariantToString(this->m_DeviceInfo[ch], deviceName, BufSize);
+    TCHAR deviceName[BufSize] = {0};
+    auto result = PropVariantToString(this->m_DeviceInfo[ch], deviceName, BufSize);
     return CString(deviceName);
 }
 
-UINT SoundControler::ChanngelCount() const{
+UINT SoundControler::ChannelCount() const{
     return this->m_ChannelCnt;
 }

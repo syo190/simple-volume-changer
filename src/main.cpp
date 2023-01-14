@@ -16,15 +16,26 @@ namespace{
 	const LPCWSTR ClassName = TEXT("VolumeChanger");
 	const LPCWSTR WindowText = TEXT("Volume Changer");
 	const int AcceptInputInterval = 100;
-	const int SliderWidth = 300;
+	const int SliderWidth = 400;
 	const int SliderHeight = 40;
 	const int BlankSpace = 30;
 	constexpr int MainWindowWidth = BlankSpace * 2 + SliderWidth;
-	constexpr int MainWindowHeight = BlankSpace * 5;
+	int MainWindowHeight = BlankSpace * 10;
 	const int SliderMinVal = 0;
 	const int SliderMaxVal = 100;
+	const int RadioButtonSize = 20;
 	LONG exDefaultStyle;
+	UINT shortcutKeyValidCh = 0;
 	SoundControler sc;
+
+	int GetChannelFromSlider(HWND hwnd){
+		for(std::size_t i = 0; i < sc.ChannelCount(); ++i){
+			auto id = GetDlgCtrlID(hwnd);
+			if(IDC_SLIDER + i == id) return i;
+		}
+
+		return -1;
+	}
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -44,6 +55,7 @@ int WINAPI WinMain(
 	}
 
 	// Create Window
+	MainWindowHeight = sc.ChannelCount() * (2 * BlankSpace + SliderHeight) + BlankSpace;
 	HWND hwnd = CreateWindowEx(
 		0, // optional window style
 		ClassName, WindowText,
@@ -88,9 +100,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 		}
 		case WM_UPDATE_VOLUME:{
 			// 音量の更新を行うメッセージ
-			// wparamには変更後の音量が格納されている
+			// wParam：変更後の音量、lParam：音量変更先デバイスch
 			float normalizedVolume = float(wParam) / float(SliderMaxVal - SliderMinVal);
-			sc.SetChannelVolume(normalizedVolume, 1);
+			sc.SetChannelVolume(normalizedVolume, UINT(lParam));
 			break;
 		}
 		case WM_PAINT:{
@@ -101,9 +113,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 		}
 		case WM_HSCROLL:{
 			int nowVolume = SendMessage(
-				GetDlgItem(hwnd, IDC_SLIDER), TBM_GETPOS, WPARAM(NULL), LPARAM(NULL)
+				HWND(lParam), TBM_GETPOS, WPARAM(NULL), LPARAM(NULL)
 			);
-			SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(nowVolume), LPARAM(NULL));
+			SendMessage(
+				hwnd, WM_UPDATE_VOLUME, WPARAM(nowVolume), GetChannelFromSlider(HWND(lParam))
+			);
 			break;
 		}
 		case WM_TIMER:{
@@ -113,14 +127,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			else if(GetAsyncKeyState(VK_F9) & 0x01) upDown = 1;
 			
 			int nowVolume = SendMessage(
-				GetDlgItem(hwnd, IDC_SLIDER), TBM_GETPOS, WPARAM(NULL), LPARAM(NULL)
+				GetDlgItem(hwnd, IDC_SLIDER + shortcutKeyValidCh), TBM_GETPOS, WPARAM(NULL), LPARAM(NULL)
 			);
 			int newVolume = nowVolume;
 			if(nowVolume + upDown >= SliderMinVal && nowVolume + upDown <= SliderMaxVal) newVolume += upDown; 
 			SendMessage(
-				GetDlgItem(hwnd, IDC_SLIDER), TBM_SETPOS, WPARAM(1), LPARAM(newVolume)
+				GetDlgItem(hwnd, IDC_SLIDER + shortcutKeyValidCh), TBM_SETPOS, WPARAM(1), LPARAM(newVolume)
 			);
-			SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(newVolume), LPARAM(NULL));
+			SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(newVolume), LPARAM(shortcutKeyValidCh));
 			break;
 		}
 		case WM_TASK_TRAY_CLIKED:{
@@ -172,20 +186,51 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 		case WM_CREATE:{
 			exDefaultStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
 
-			Slider slider(
-				hwnd, (LPCREATESTRUCT(lParam))->hInstance,
-				BlankSpace, BlankSpace, SliderWidth, SliderHeight, IDC_SLIDER
-			);
-			SendMessage(
-				slider.GetHandler(), TBM_SETRANGE, WPARAM(true), MAKELPARAM(SliderMinVal, SliderMaxVal)
-			);
-			float normalizedVolume = sc.GetChannelNormalizedVolume(1);
-			int volume = static_cast<int>(std::floor(normalizedVolume * (SliderMaxVal - SliderMinVal)));
-			SendMessage(
-				GetDlgItem(hwnd, IDC_SLIDER), TBM_SETPOS, WPARAM(1), LPARAM(volume)
-			);
+			// create slider control and set its position according to master sound volume
+			for(std::size_t i = 0; i < sc.ChannelCount(); ++i){
+				Slider slider(
+					hwnd, (LPCREATESTRUCT(lParam))->hInstance,
+					BlankSpace, BlankSpace * (i + 2) + SliderHeight * i, SliderWidth, SliderHeight, IDC_SLIDER + i
+				);
+				SendMessage(
+					slider.GetHandler(), TBM_SETRANGE, WPARAM(true), MAKELPARAM(SliderMinVal, SliderMaxVal)
+				);
+				float normalizedVolume = sc.GetChannelNormalizedVolume(i);
+				int volume = static_cast<int>(std::floor(normalizedVolume * (SliderMaxVal - SliderMinVal)));
+				SendMessage(
+					GetDlgItem(hwnd, IDC_SLIDER + i), TBM_SETPOS, WPARAM(1), LPARAM(volume)
+				);
 
+				// explanation of the slider
+				LPCTSTR name = sc.DeviceName(i);
+				CreateWindow(
+					_T("STATIC"), name,
+					WS_CHILD | WS_VISIBLE,
+					BlankSpace * 2, BlankSpace * (i + 1) + SliderHeight * i, SliderWidth, BlankSpace,
+					hwnd, HMENU(IDC_STATIC_CONTROL + i), (LPCREATESTRUCT(lParam))->hInstance, NULL
+				);
+
+				// radio button is according to master sound volume that is changed by shortcut key
+				CreateWindow(
+					_T("BUTTON"), _T(""),
+					WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON | (i == 0 ? WS_GROUP: NULL),
+					BlankSpace, BlankSpace * (i + 1) + SliderHeight * i, RadioButtonSize, RadioButtonSize,
+					hwnd, HMENU(IDC_RADIO_BUTTON + i), (LPCREATESTRUCT(lParam))->hInstance, NULL
+				);
+			}
+
+			shortcutKeyValidCh = 0;
+			SendMessage(GetDlgItem(hwnd, IDC_RADIO_BUTTON + shortcutKeyValidCh),BM_SETCHECK, BST_CHECKED, WPARAM(NULL));
 			SetTimer(hwnd, IDT_ACCEPT_INPUT, AcceptInputInterval, TIMERPROC(NULL));
+			break;
+		}
+		case WM_COMMAND:{
+			for(std::size_t i = 0; i < sc.ChannelCount(); ++i){
+				if(LOWORD(wParam) == IDC_RADIO_BUTTON + i){
+					shortcutKeyValidCh = i;
+					break;
+				}
+			}
 			break;
 		}
 		case WM_CLOSE:{

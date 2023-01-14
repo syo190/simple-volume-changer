@@ -2,7 +2,7 @@
 #include"..\inc\ID.h"
 
 Slider::Slider(HWND hWndParent, HINSTANCE hInstance, int x, int y, int width, int height, int ctrlID):
-    m_hWndParent(hWndParent), m_hInstance(hInstance), m_x(x), m_y(), m_width(width), m_height(height), m_ctrlID(ctrlID)
+    m_hWndParent(hWndParent), m_hInstance(hInstance), m_x(x), m_y(y), m_width(width), m_height(height), m_ctrlID(ctrlID)
 {
     // initialize for comctrl dll
     INITCOMMONCONTROLSEX comCtrl = {};
