@@ -28,6 +28,7 @@ namespace{
 	UINT shortcutKeyValidCh = 0;
 	SoundControler sc;
 
+	// Sliderのハンドラから該当するchを返す。該当するchが無い場合は-1を返す。
 	int GetChannelFromSlider(HWND hwnd){
 		for(std::size_t i = 0; i < sc.ChannelCount(); ++i){
 			auto id = GetDlgCtrlID(hwnd);
@@ -49,6 +50,7 @@ int WINAPI WinMain(
 	wndC.hInstance = hInstance;
 	wndC.lpszClassName = ClassName;
 	wndC.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW);
+	wndC.hIcon = HICON(LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPLICATION)));
 
 	if(!RegisterClass(&wndC)){
 		return -1;
@@ -72,7 +74,7 @@ int WINAPI WinMain(
 		return -1;
 	}
 
-	tk.Initialize(hInstance, hwnd, IDI_TASK_TRAY, WM_TASK_TRAY_CLIKED);
+	tk.Initialize(hInstance, hwnd, IDI_TASK_TRAY, WM_TASK_TRAY_CLIKED, HICON(LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPLICATION))));
 
 	// run message loop
     MSG msg = {};
@@ -179,7 +181,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 				auto exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
 				exStyle = (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
 				SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
-				ShowWindow(hwnd, SW_HIDE);
 			}
 			break;
 		}

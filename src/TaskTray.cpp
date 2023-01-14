@@ -23,9 +23,9 @@ TaskTray::TaskTray(){
     this->m_isAlive = false;
 }
 
-TaskTray::TaskTray(HINSTANCE hInstance, HWND hwnd, UINT nID, UINT callBacklMsg):
+TaskTray::TaskTray(HINSTANCE hInstance, HWND hwnd, UINT nID, UINT callBacklMsg, HICON hIcon):
 m_receiver(hwnd), m_hiddenWindow(NULL), m_id(nID), m_isAlive(false), m_callBackMsg(callBacklMsg){
-    this->Initialize(hInstance, hwnd, nID, callBacklMsg);
+    this->Initialize(hInstance, hwnd, nID, callBacklMsg, hIcon);
 }
 
 TaskTray::~TaskTray(){
@@ -36,13 +36,14 @@ TaskTray::~TaskTray(){
     PostMessage(this->m_hiddenWindow, WM_DESTROY, WPARAM(NULL), LPARAM(NULL));
 }
 
-BOOL TaskTray::Initialize(HINSTANCE hInstance, HWND hwnd, UINT nID, UINT callBackMsg){
+BOOL TaskTray::Initialize(HINSTANCE hInstance, HWND hwnd, UINT nID, UINT callBackMsg, HICON hIcon){
     if(this->m_hiddenWindow != NULL) return FALSE;
 
     this->m_receiver = hwnd;
     this->m_id = nID;
     this->m_isAlive = false;
     this->m_callBackMsg = callBackMsg;
+    this->m_hIcon = hIcon;
 
     CString className;
     className.Format("hidden window [%d]", this->m_id);
@@ -82,7 +83,8 @@ BOOL TaskTray::Create(){
     nd.cbSize = sizeof(NOTIFYICONDATA);
     nd.hWnd = this->m_receiver;
     nd.uID = this->m_id;
-    nd.uFlags = NIF_MESSAGE;
+    nd.uFlags = NIF_MESSAGE | NIF_ICON;
+    nd.hIcon = this->m_hIcon;
     nd.uCallbackMessage = this->m_callBackMsg;
 
     this->m_isAlive = Shell_NotifyIcon(NIM_ADD, &nd);

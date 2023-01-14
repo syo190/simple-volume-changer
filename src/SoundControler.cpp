@@ -7,15 +7,9 @@
 #include<propvarutil.h>
 
 /*
-３．
-デバイス名のラベルを付与する
-
-４．
-デバイス数に応じてウィンドウサイズを変更して開く
-
-５．
-ショートカットキーを選択できるようにする
+ショートカットキーにどれを使用するか選択させる機能
 */
+
 
 SoundControler::SoundControler(): m_ChannelCnt(0){
     CComPtr<IMMDeviceEnumerator> pMMDeviceEnu;
@@ -89,6 +83,7 @@ CString SoundControler::DeviceName(UINT ch) const{
     return CString(deviceName);
 }
 
+// ch数を返す
 UINT SoundControler::ChannelCount() const{
     return this->m_ChannelCnt;
 }

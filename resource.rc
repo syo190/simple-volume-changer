@@ -1,0 +1,4 @@
+#include".\inc\ID.h"
+
+// application icon
+IDI_APPLICATION ICON "VolumeChanger.ico"
