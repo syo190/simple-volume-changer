@@ -8,9 +8,12 @@ class TaskTray{
     UINT m_callBackMsg;
     bool m_isAlive;
 public:
+    TaskTray();
     TaskTray(HINSTANCE hInstance, HWND hwnd, UINT nID, UINT callBaclMsg);
     ~TaskTray();
 
+    BOOL Initialize(HINSTANCE hInstance, HWND hwnd, UINT nID, UINT callBaclMsg);
+    BOOL SetForegroundDummyWindow();
     BOOL Create();
     BOOL Destroy();
 };

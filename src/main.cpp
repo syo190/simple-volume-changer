@@ -23,10 +23,12 @@ namespace{
 	constexpr int MainWindowHeight = BlankSpace * 5;
 	const int SliderMinVal = 0;
 	const int SliderMaxVal = 100;
+	LONG exDefaultStyle;
 	SoundControler sc;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+TaskTray tk;
 
 int WINAPI WinMain(
 	HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow
@@ -58,7 +60,7 @@ int WINAPI WinMain(
 		return -1;
 	}
 
-	TaskTray tk(hInstance, hwnd, IDI_TASK_TRAY, WM_TASK_TRAY_CLIKED);
+	tk.Initialize(hInstance, hwnd, IDI_TASK_TRAY, WM_TASK_TRAY_CLIKED);
 
 	// run message loop
     MSG msg = {};
@@ -77,6 +79,7 @@ int WINAPI WinMain(
 
 // window procedure of main window
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
+
 	switch(uMsg){
 		case WM_DESTROY:{
 			KillTimer(hwnd, IDT_ACCEPT_INPUT);
@@ -129,7 +132,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 				POINT pt = {0};
 				GetCursorPos(&pt);
 
-				SetForegroundWindow(hwnd);
+				tk.SetForegroundDummyWindow();
 				HMENU hMenu = CreatePopupMenu();
 				InsertMenu(
 					hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_OPEN_FROM_TASK_TRAY, _T("VoiceChanger") 
@@ -143,18 +146,31 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 					pt.x, pt.y, 0,
 					hwnd, NULL
 				);
-				PostMessage(hwnd, WM_NULL, WPARAM(NULL), LPARAM(NULL));
 
 				if(clikedID == IDM_CLOSE_FROM_TASK_TRAY){
 					SendMessage(hwnd, WM_CLOSE, WPARAM(NULL), LPARAM(NULL));
 				}else if(clikedID == IDM_OPEN_FROM_TASK_TRAY){
-					int s = 0;
+					// タスクバー通知領域 -> タスクバーへ移動
+					SetWindowLongPtr(hwnd, GWL_EXSTYLE, exDefaultStyle);
+					ShowWindow(hwnd, SW_SHOWNORMAL);
+					tk.Destroy();
 				}
 			}
 			break;
 		}
+		case WM_SYSCOMMAND:{
+			if(wParam == SC_MINIMIZE){
+				// タスクバー -> タスクバー通知領域へ移動
+				tk.Create();
+				auto exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+				exStyle = (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
+				SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
+				ShowWindow(hwnd, SW_HIDE);
+			}
+			break;
+		}
 		case WM_CREATE:{
-
+			exDefaultStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
 
 			Slider slider(
 				hwnd, (LPCREATESTRUCT(lParam))->hInstance,
@@ -170,6 +186,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			);
 
 			SetTimer(hwnd, IDT_ACCEPT_INPUT, AcceptInputInterval, TIMERPROC(NULL));
+			break;
+		}
+		case WM_CLOSE:{
+			DestroyWindow(hwnd);
 			break;
 		}
 		default:{
