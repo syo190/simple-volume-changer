@@ -1,3 +1,6 @@
+#ifndef SoundControler_HEADER_
+#define SoundControler_HEADER_
+
 #include<windows.h>
 #include<endpointvolume.h>
 #include<mmdeviceapi.h>
@@ -19,3 +22,5 @@ public:
     CString DeviceName(UINT ch) const;
     UINT ChannelCount() const;
 };
+
+#endif

@@ -1,3 +1,5 @@
+#ifndef TaskTray_HEADER_
+#define TaskTray_HEADER_
 #include<windows.h>
 #include<atlbase.h>
 
@@ -28,3 +30,4 @@ public:
     BOOL Destroy();
 };
 
+#endif

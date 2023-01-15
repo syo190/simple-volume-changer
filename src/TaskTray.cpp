@@ -33,6 +33,7 @@ TaskTray::~TaskTray(){
         this->Destroy();
     }
 
+    DestroyIcon(this->m_hIcon);
     PostMessage(this->m_hiddenWindow, WM_DESTROY, WPARAM(NULL), LPARAM(NULL));
 }
 
