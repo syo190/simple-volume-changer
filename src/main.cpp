@@ -12,6 +12,15 @@
 #include"..\inc\ID.h"
 #include"..\inc\SoundControler.h"
 #include"..\inc\TaskTray.h"
+#include"..\inc\EditBox.h"
+
+/*
+editをグローバル変数で持たせるのはダイアログのハンドラが代わるのにcreateを何回も呼ぶおかしな挙動を引き起こす。
+そこで、グローバル変数で持たせるのはやめてファイル(ini)にそのキーを格納することとする。
+そしてOKが押されればキーの結果を読み込むことでグローバル変数に格納する。
+一方でiniに入れてあるので次に再びアプリケーションを起動したときもそれで開始する。
+またダイアログを開いたときはその値をデフォルト値として再開する。
+*/
 
 namespace{
 	const LPCWSTR ClassName = _T("VolumeChanger");
@@ -19,6 +28,7 @@ namespace{
 	const LPCWSTR SettingClassName = _T("Shortcut Key Setting");
 	const LPCWSTR SWindowText = _T("Shortcut Key Setting");
 	const int AcceptInputInterval = 100;
+	const int AcceptKeySetInputInterval = 100;
 	const int SliderWidth = 400;
 	const int SliderHeight = 40;
 	const int BlankSpace = 30;
@@ -36,6 +46,7 @@ namespace{
 	LONG exDefaultStyle;
 	UINT shortcutKeyValidCh = 0;
 	SoundControler sc;
+	EditBox edt[IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1];
 
 	// Sliderのハンドラから該当するchを返す。該当するchが無い場合は-1を返す。
 	int GetChannelFromSlider(HWND hwnd){
@@ -133,10 +144,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			break;
 		}
 		case WM_TIMER:{
-			if(!GetAsyncKeyState(VK_CONTROL)) break;
+			// if(!GetAsyncKeyState(VK_CONTROL)) break;
 			int upDown = 0;
-			if(GetAsyncKeyState(VK_F8) & 0x01) upDown = -1;
-			else if(GetAsyncKeyState(VK_F9) & 0x01) upDown = 1;
+			for(int i = 0; i < IDC_SHORTCUTKEY_DLG_EDIT_UP3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1; ++i){
+				int vk = 0;
+				if(!(edt[i].GetVK(vk) && (GetAsyncKeyState(vk) & 0x01))) break;
+				if(i + 1 == IDC_SHORTCUTKEY_DLG_EDIT_UP3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1) upDown = 1;
+			}
+			for(int i = 0; i < IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_DOWN1; ++i){
+				int vk = 0;
+				if(!(edt[i].GetVK(vk) && (GetAsyncKeyState(vk) & 0x01))) break;
+				if(i + 1 == IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_DOWN1) upDown = -1;
+			}			
+			// if(GetAsyncKeyState(VK_F8) & 0x01) upDown = -1;
+			// else if(GetAsyncKeyState(VK_F9) & 0x01) upDown = 1;
 			
 			int nowVolume = SendMessage(
 				GetDlgItem(hwnd, IDC_SLIDER + shortcutKeyValidCh), TBM_GETPOS, WPARAM(NULL), LPARAM(NULL)
@@ -276,36 +297,32 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 
 
 BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
-
-	static const int detectedKeyList[] = {
-		VK_SHIFT, VK_CONTROL, VK_MENU, VK_PAUSE, VK_CAPITAL, VK_ESCAPE, VK_SPACE, VK_PRIOR, VK_NEXT,
-		VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN,
-		0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, // 0 ~ 9
-		0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, // A ~ J
-		0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50, 0x51, 0x52, 0x53, 0x54, // K ~ T
-		0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, // U ~ Z
-		VK_LWIN, VK_RWIN, VK_APPS,
-		VK_NUMPAD0, VK_NUMPAD1, VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD4, VK_NUMPAD5, VK_NUMPAD6, VK_NUMPAD7, VK_NUMPAD8, VK_NUMPAD9, // numpad 0 ~ 9
-		VK_MULTIPLY, VK_ADD, VK_SEPARATOR, VK_SUBTRACT,
-		VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12,
-		VK_NUMLOCK, VK_LSHIFT, VK_RSHIFT, VK_LCONTROL, VK_RCONTROL, VK_LMENU, VK_RMENU 
-	};
-	static const LPCTSTR detectedKeyNameList[] = {
-		_T("Shift"), _T("Control"), _T("Alt"), _T("Pause"), _T("CapsLock"), _T("Esc"), _T("Space"), _T("PageUp"), _T("PageDown"),
-		_T("Left"), _T("Up"), _T("Right"), _T("Down"),
-		_T("0"), _T("1"), _T("2"), _T("3"), _T("4"), _T("5"), _T("6"), _T("7"), _T("8"), _T("9"),
-		_T("A"), _T("B"), _T("C"), _T("D"), _T("E"), _T("F"), _T("G"), _T("H"), _T("I"), _T("J"),
-		_T("K"), _T("L"), _T("M"), _T("N"), _T("O"), _T("P"), _T("Q"), _T("R"), _T("S"), _T("T"),
-		_T("U"), _T("V"), _T("W"), _T("X"), _T("Y"), _T("Z"),
-		_T("LeftWin"), _T("RightWin"), _T("App"),
-		_T("Pad0"), _T("Pad1"), _T("Pad2"), _T("Pad3"), _T("Pad4"), _T("Pad5"), _T("Pad6"), _T("Pad7"), _T("Pad8"), _T("Pad9"),
-		_T("Multiply"), _T("Add"), _T("Divide"), _T("Subtract"),
-		_T("F1"), _T("F2"), _T("F3"), _T("F4"), _T("F5"), _T("F6"), _T("F7"), _T("F8"), _T("F9"), _T("F10"), _T("F11"), _T("F12"),
-		_T("NumLock"), _T("LeftShift"), _T("RightShift"), _T("LeftControl"), _T("RightControl"), _T("LeftAlt"), _T("RightAlt")   
-	};
-	static const std::size_t keyCnt = std::size(detectedKeyList);
+	static int init_x = 95;
+	static int init_y = 12;
+	static int offset_x = 40;
+	static int offset_y = 55;
+	static int edit_width = 84;
+	static int edit_height = 25;
 
 	switch(uMsg){
+		case WM_INITDIALOG:{
+			HINSTANCE hInstance = HINSTANCE(GetWindowLongPtr(hwndDlg, GWLP_HINSTANCE));
+			for(int id = IDC_SHORTCUTKEY_DLG_EDIT_UP1; id <= IDC_SHORTCUTKEY_DLG_EDIT_UP3; ++id){
+				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Initialize(
+					hwndDlg, hInstance,
+					init_x + (edit_width + offset_x) * (id - IDC_SHORTCUTKEY_DLG_EDIT_UP1), init_y, edit_width, edit_height, id
+				);
+				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Create();
+			}
+			for(int id = IDC_SHORTCUTKEY_DLG_EDIT_DOWN1; id <= IDC_SHORTCUTKEY_DLG_EDIT_DOWN3; ++id){
+				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Initialize(
+					hwndDlg, hInstance,
+					init_x + (edit_width + offset_x) * (id - IDC_SHORTCUTKEY_DLG_EDIT_DOWN1), init_y + offset_y, edit_width, edit_height, id
+				);
+				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Create();
+			}
+			return TRUE;
+		}
 		case WM_CLOSE:{
 			EndDialog(hwndDlg, IDCANCEL);
 			return TRUE;
@@ -317,32 +334,7 @@ BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			}else if(LOWORD(wParam) == IDC_SHORTCUTKEY_DLG_CANCEL){
 				EndDialog(hwndDlg, IDCANCEL);
 				return TRUE;
-			}else if(IDC_SHORTCUTKEY_DLG_EDIT_UP1 <= LOWORD(wParam)
-			&& LOWORD(wParam) <= IDC_SHORTCUTKEY_DLG_EDIT_DOWN3){
-				if(HIWORD(wParam) != EN_SETFOCUS) return FALSE;
-
-				// フォーカスが当たっていることの確認
-				int focusedEditID = -1;
-				HWND focusedWnd = GetFocus();
-				for(int id = IDC_SHORTCUTKEY_DLG_EDIT_UP1; id <= IDC_SHORTCUTKEY_DLG_EDIT_DOWN3; ++id){
-					if(focusedWnd == GetDlgItem(hwndDlg, id)){
-						focusedEditID = id;
-						break;
-					}
-				}
-				if(focusedEditID == -1) ATLASSERT(_T("ERROR"));
-
-				HDC hdc = GetDC(focusedWnd);
-				SetBkMode(hdc, TRANSPARENT);
-				ReleaseDC(focusedWnd, hdc);
 			}
-
-			break;
-		}
-		case WM_CTLCOLOREDIT:{
-			SetBkMode(HDC(wParam), TRANSPARENT);
-			SetTextColor(HDC(wParam), RGB(0, 0, 256));
-			return BOOL(GetStockObject(BLACK_BRUSH));
 		}
 		default:{
 			break;
