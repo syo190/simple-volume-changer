@@ -33,6 +33,8 @@ public:
 
     // 見つかったときはtrueを返す
     bool GetVK(int& vk);
+    // 成功すればtrueを返す
+    bool SetVK(int vk);
 };
 
 #endif

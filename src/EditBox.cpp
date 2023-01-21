@@ -115,3 +115,14 @@ bool EditBox::GetVK(int& vk){
 
     return false;
 }
+
+bool EditBox::SetVK(int vk){
+    for(std::size_t i = 0; i < std::size(detectedKeyList); ++i){
+        if(vk == detectedKeyList[i]){
+            SetWindowText(this->m_hwnd, detectedKeyNameList[i]);
+            return true;
+        }
+    }
+
+    return false;
+}

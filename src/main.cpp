@@ -7,20 +7,14 @@
 #include<endpointvolume.h>
 #include<cmath>
 #include<vector>
+#include<array>
+#include<fstream>
 
 #include"..\inc\Slider.h"
 #include"..\inc\ID.h"
 #include"..\inc\SoundControler.h"
 #include"..\inc\TaskTray.h"
 #include"..\inc\EditBox.h"
-
-/*
-editをグローバル変数で持たせるのはダイアログのハンドラが代わるのにcreateを何回も呼ぶおかしな挙動を引き起こす。
-そこで、グローバル変数で持たせるのはやめてファイル(ini)にそのキーを格納することとする。
-そしてOKが押されればキーの結果を読み込むことでグローバル変数に格納する。
-一方でiniに入れてあるので次に再びアプリケーションを起動したときもそれで開始する。
-またダイアログを開いたときはその値をデフォルト値として再開する。
-*/
 
 namespace{
 	const LPCWSTR ClassName = _T("VolumeChanger");
@@ -45,8 +39,9 @@ namespace{
 	const int SWindowHeight = 300;
 	LONG exDefaultStyle;
 	UINT shortcutKeyValidCh = 0;
+	const char ConfigFilePath[] = "./shorcutkey.bin";
+	std::int32_t vkArray[IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1 + 1] = {NULL};
 	SoundControler sc;
-	EditBox edt[IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1];
 
 	// Sliderのハンドラから該当するchを返す。該当するchが無い場合は-1を返す。
 	int GetChannelFromSlider(HWND hwnd){
@@ -56,6 +51,30 @@ namespace{
 		}
 
 		return -1;
+	}
+
+	// 成功すれば戻り値true
+	bool WriteShortcutKey(const std::int32_t shortcutKey[], std::size_t length){
+		std::ofstream ofs;
+		ofs.open(ConfigFilePath, std::ios::out | std::ios::binary);
+		if(!ofs) return false;
+
+		ofs.write(reinterpret_cast<const char*>(shortcutKey), sizeof(std::int32_t) * length);
+		if(ofs.fail()) return false;
+		ofs.close();
+		return true;
+	}
+
+	// 成功すれば戻り値true
+	bool ReadShortcutKey(std::int32_t shortcutkey[], std::size_t length){
+		std::ifstream ifs;
+		ifs.open(ConfigFilePath, std::ios::in | std::ios::binary);
+		if(!ifs) return false;
+
+		ifs.read(reinterpret_cast<char*>(shortcutkey), sizeof(std::int32_t) * length);
+		if(ifs.fail()) return false;
+		ifs.close();
+		return  true;
 	}
 }
 
@@ -144,20 +163,30 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			break;
 		}
 		case WM_TIMER:{
-			// if(!GetAsyncKeyState(VK_CONTROL)) break;
 			int upDown = 0;
-			for(int i = 0; i < IDC_SHORTCUTKEY_DLG_EDIT_UP3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1; ++i){
-				int vk = 0;
-				if(!(edt[i].GetVK(vk) && (GetAsyncKeyState(vk) & 0x01))) break;
-				if(i + 1 == IDC_SHORTCUTKEY_DLG_EDIT_UP3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1) upDown = 1;
+			int sum = 0;
+			bool changeFlag = true;
+			for(std::size_t i = 0; i < std::size(vkArray) / 2; ++i){
+				sum += vkArray[i];
+				if(vkArray[i] == NULL) continue;
+				if(!GetAsyncKeyState(vkArray[i])){
+					changeFlag = false;
+					break;
+				}
 			}
-			for(int i = 0; i < IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_DOWN1; ++i){
-				int vk = 0;
-				if(!(edt[i].GetVK(vk) && (GetAsyncKeyState(vk) & 0x01))) break;
-				if(i + 1 == IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_DOWN1) upDown = -1;
-			}			
-			// if(GetAsyncKeyState(VK_F8) & 0x01) upDown = -1;
-			// else if(GetAsyncKeyState(VK_F9) & 0x01) upDown = 1;
+			if(sum != 0 && changeFlag) upDown = 1;
+
+			sum = 0;
+			changeFlag = true;
+			for(std::size_t i = std::size(vkArray) / 2; i < std::size(vkArray); ++i){
+				sum += vkArray[i];
+				if(vkArray[i] == NULL) continue;
+				if(!GetAsyncKeyState(vkArray[i])){
+					changeFlag = false;
+					break;
+				}
+			}
+			if(sum != 0 && changeFlag) upDown = -1;
 			
 			int nowVolume = SendMessage(
 				GetDlgItem(hwnd, IDC_SLIDER + shortcutKeyValidCh), TBM_GETPOS, WPARAM(NULL), LPARAM(NULL)
@@ -193,6 +222,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 					pt.x, pt.y, 0,
 					hwnd, NULL
 				);
+				DestroyMenu(hMenu);
 
 				if(clikedID == IDM_CLOSE_FROM_TASK_TRAY){
 					SendMessage(hwnd, WM_CLOSE, WPARAM(NULL), LPARAM(NULL));
@@ -260,6 +290,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 					BlankSpace, BlankSpace * (i + 1) + ButtonHeight + SliderHeight * i, RadioButtonSize, RadioButtonSize,
 					hwnd, HMENU(IDC_RADIO_BUTTON + i), (LPCREATESTRUCT(lParam))->hInstance, NULL
 				);
+
+				// load preset shortcut key
+				ReadShortcutKey(vkArray, std::size(vkArray));
 			}
 
 			shortcutKeyValidCh = 0;
@@ -274,6 +307,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 					HINSTANCE(GetWindowLongPtr(hwnd, GWL_HINSTANCE)), LPCTSTR(IDI_SHORTCUTKEY_DLG),
 					hwnd, DialogProc
 				);
+				if(result == IDOK){
+					// キー更新
+					ReadShortcutKey(vkArray, std::size(vkArray));
+				}
 			}else{
 				for(std::size_t i = 0; i < sc.ChannelCount(); ++i){
 					if(LOWORD(wParam) == IDC_RADIO_BUTTON + i){
@@ -303,6 +340,7 @@ BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
 	static int offset_y = 55;
 	static int edit_width = 84;
 	static int edit_height = 25;
+	static EditBox edt[IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1 + 1];
 
 	switch(uMsg){
 		case WM_INITDIALOG:{
@@ -313,6 +351,7 @@ BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
 					init_x + (edit_width + offset_x) * (id - IDC_SHORTCUTKEY_DLG_EDIT_UP1), init_y, edit_width, edit_height, id
 				);
 				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Create();
+				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].SetVK(vkArray[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1]);
 			}
 			for(int id = IDC_SHORTCUTKEY_DLG_EDIT_DOWN1; id <= IDC_SHORTCUTKEY_DLG_EDIT_DOWN3; ++id){
 				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Initialize(
@@ -320,6 +359,7 @@ BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
 					init_x + (edit_width + offset_x) * (id - IDC_SHORTCUTKEY_DLG_EDIT_DOWN1), init_y + offset_y, edit_width, edit_height, id
 				);
 				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Create();
+				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].SetVK(vkArray[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1]);
 			}
 			return TRUE;
 		}
@@ -330,6 +370,13 @@ BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
 		case WM_COMMAND:{
 			if(LOWORD(wParam) == IDC_SHORTCUTKEY_DLG_OK){
 				EndDialog(hwndDlg, IDOK);
+				std::int32_t shortcutKey[IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1 + 1];
+				for(std::size_t i = 0; i < std::size(shortcutKey); ++i){
+					int vk;
+					if(edt[i].GetVK(vk)) shortcutKey[i] = vk;
+					else shortcutKey[i] = NULL;
+				}
+				WriteShortcutKey(shortcutKey, std::size(shortcutKey));
 				return TRUE;
 			}else if(LOWORD(wParam) == IDC_SHORTCUTKEY_DLG_CANCEL){
 				EndDialog(hwndDlg, IDCANCEL);
