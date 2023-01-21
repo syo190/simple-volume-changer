@@ -201,10 +201,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 		}
 		case WM_TASK_TRAY_CLIKED:{
 			auto id = (UINT)(lParam);
-			if(id == WM_LBUTTONUP){
-				int a = 43;
-			}
-			else if(id == WM_RBUTTONUP){
+			if(id == WM_RBUTTONUP){
 				POINT pt = {0};
 				GetCursorPos(&pt);
 
@@ -229,7 +226,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 				}else if(clikedID == IDM_OPEN_FROM_TASK_TRAY){
 					// タスクバー通知領域 -> タスクバーへ移動
 					SetWindowLongPtr(hwnd, GWL_EXSTYLE, exDefaultStyle);
-					ShowWindow(hwnd, SW_SHOWNORMAL);
+					ShowWindow(hwnd, SW_SHOW);
 					tk.Destroy();
 				}
 			}
@@ -242,13 +239,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 				auto exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
 				exStyle = (exStyle & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
 				SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle);
+				ShowWindow(hwnd, SW_HIDE);
+				return 0;
 			}
 			break;
 		}
 		case WM_CREATE:{
-			HMENU hSysMenu = GetSystemMenu(hwnd, FALSE);
-			RemoveMenu(hSysMenu, SC_MAXIMIZE, MF_BYCOMMAND);
-
 			exDefaultStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
 
 			// create button to set shortcut key
