@@ -188,9 +188,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			}
 			if(sum != 0 && changeFlag) upDown = -1;
 			
-			int nowVolume = SendMessage(
-				GetDlgItem(hwnd, IDC_SLIDER + shortcutKeyValidCh), TBM_GETPOS, WPARAM(NULL), LPARAM(NULL)
-			);
+			float normalizedNowVolume = sc.GetChannelNormalizedVolume(shortcutKeyValidCh);
+			int nowVolume = static_cast<int>(std::round(normalizedNowVolume * (SliderMaxVal - SliderMinVal)));
 			int newVolume = nowVolume;
 			if(nowVolume + upDown >= SliderMinVal && nowVolume + upDown <= SliderMaxVal) newVolume += upDown; 
 			SendMessage(
@@ -265,7 +264,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 					slider.GetHandler(), TBM_SETRANGE, WPARAM(true), MAKELPARAM(SliderMinVal, SliderMaxVal)
 				);
 				float normalizedVolume = sc.GetChannelNormalizedVolume(i);
-				int volume = static_cast<int>(std::floor(normalizedVolume * (SliderMaxVal - SliderMinVal)));
+				int volume = static_cast<int>(std::round(normalizedVolume * (SliderMaxVal - SliderMinVal)));
 				SendMessage(
 					GetDlgItem(hwnd, IDC_SLIDER + i), TBM_SETPOS, WPARAM(1), LPARAM(volume)
 				);
