@@ -38,9 +38,13 @@ namespace{
 	const int SWindowWidth = 300;
 	const int SWindowHeight = 300;
 	LONG exDefaultStyle;
-	UINT shortcutKeyValidCh = 0;
+	BOOL isDlgAlive = FALSE;
 	const char ConfigFilePath[] = "./shorcutkey.bin";
-	std::int32_t vkArray[IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1 + 1] = {NULL};
+	struct SavedData{
+		UINT shortcutKeyValidCh = 0;
+		std::int32_t vkArray[IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1 + 1] = {NULL};
+	};
+	SavedData sd;
 	SoundControler sc;
 
 	// Sliderのハンドラから該当するchを返す。該当するchが無い場合は-1を返す。
@@ -54,26 +58,30 @@ namespace{
 	}
 
 	// 成功すれば戻り値true
-	bool WriteShortcutKey(const std::int32_t shortcutKey[], std::size_t length){
+	bool WriteShortcutKey(const SavedData& sd){
 		std::ofstream ofs;
 		ofs.open(ConfigFilePath, std::ios::out | std::ios::binary);
 		if(!ofs) return false;
 
-		ofs.write(reinterpret_cast<const char*>(shortcutKey), sizeof(std::int32_t) * length);
+		ofs.write(reinterpret_cast<const char*>(&sd), sizeof(sd));
 		if(ofs.fail()) return false;
 		ofs.close();
 		return true;
 	}
 
 	// 成功すれば戻り値true
-	bool ReadShortcutKey(std::int32_t shortcutkey[], std::size_t length){
+	bool ReadShortcutKey(SavedData* sd){
+		if(sd == NULL) return false;
 		std::ifstream ifs;
 		ifs.open(ConfigFilePath, std::ios::in | std::ios::binary);
 		if(!ifs) return false;
 
-		ifs.read(reinterpret_cast<char*>(shortcutkey), sizeof(std::int32_t) * length);
+		ifs.read(reinterpret_cast<char*>(sd), sizeof(*sd));
 		if(ifs.fail()) return false;
 		ifs.close();
+
+		// 値が不正にならないようにする
+		if(sd->shortcutKeyValidCh >= sc.ChannelCount()) sd->shortcutKeyValidCh = 0;
 		return  true;
 	}
 }
@@ -163,13 +171,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 			break;
 		}
 		case WM_TIMER:{
+			if(isDlgAlive){
+				break; // 設定ダイアログが出ている場合はスルー
+			}
+
 			int upDown = 0;
 			int sum = 0;
 			bool changeFlag = true;
-			for(std::size_t i = 0; i < std::size(vkArray) / 2; ++i){
-				sum += vkArray[i];
-				if(vkArray[i] == NULL) continue;
-				if(!GetAsyncKeyState(vkArray[i])){
+			for(std::size_t i = 0; i < std::size(sd.vkArray) / 2; ++i){
+				sum += sd.vkArray[i];
+				if(sd.vkArray[i] == NULL) continue;
+				if(!GetAsyncKeyState(sd.vkArray[i])){
 					changeFlag = false;
 					break;
 				}
@@ -178,24 +190,24 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 
 			sum = 0;
 			changeFlag = true;
-			for(std::size_t i = std::size(vkArray) / 2; i < std::size(vkArray); ++i){
-				sum += vkArray[i];
-				if(vkArray[i] == NULL) continue;
-				if(!GetAsyncKeyState(vkArray[i])){
+			for(std::size_t i = std::size(sd.vkArray) / 2; i < std::size(sd.vkArray); ++i){
+				sum += sd.vkArray[i];
+				if(sd.vkArray[i] == NULL) continue;
+				if(!GetAsyncKeyState(sd.vkArray[i])){
 					changeFlag = false;
 					break;
 				}
 			}
 			if(sum != 0 && changeFlag) upDown = -1;
 			
-			float normalizedNowVolume = sc.GetChannelNormalizedVolume(shortcutKeyValidCh);
+			float normalizedNowVolume = sc.GetChannelNormalizedVolume(sd.shortcutKeyValidCh);
 			int nowVolume = static_cast<int>(std::round(normalizedNowVolume * (SliderMaxVal - SliderMinVal)));
 			int newVolume = nowVolume;
 			if(nowVolume + upDown >= SliderMinVal && nowVolume + upDown <= SliderMaxVal) newVolume += upDown; 
 			SendMessage(
-				GetDlgItem(hwnd, IDC_SLIDER + shortcutKeyValidCh), TBM_SETPOS, WPARAM(1), LPARAM(newVolume)
+				GetDlgItem(hwnd, IDC_SLIDER + sd.shortcutKeyValidCh), TBM_SETPOS, WPARAM(1), LPARAM(newVolume)
 			);
-			SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(newVolume), LPARAM(shortcutKeyValidCh));
+			SendMessage(hwnd, WM_UPDATE_VOLUME, WPARAM(newVolume), LPARAM(sd.shortcutKeyValidCh));
 			break;
 		}
 		case WM_TASK_TRAY_CLIKED:{
@@ -287,12 +299,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 				);
 
 				// load preset shortcut key
-				ReadShortcutKey(vkArray, std::size(vkArray));
+				ReadShortcutKey(&sd);
 			}
 
-			shortcutKeyValidCh = 0;
-			SendMessage(GetDlgItem(hwnd, IDC_RADIO_BUTTON + shortcutKeyValidCh),BM_SETCHECK, BST_CHECKED, WPARAM(NULL));
+			SendMessage(GetDlgItem(hwnd, IDC_RADIO_BUTTON + sd.shortcutKeyValidCh),BM_SETCHECK, BST_CHECKED, WPARAM(NULL));
 			SetTimer(hwnd, IDT_ACCEPT_INPUT, AcceptInputInterval, TIMERPROC(NULL));
+
+			// 最小化した状態で始める
+			PostMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
 			break;
 		}
 		case WM_COMMAND:{
@@ -304,12 +318,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 				);
 				if(result == IDOK){
 					// キー更新
-					ReadShortcutKey(vkArray, std::size(vkArray));
+					ReadShortcutKey(&sd);
 				}
 			}else{
 				for(std::size_t i = 0; i < sc.ChannelCount(); ++i){
 					if(LOWORD(wParam) == IDC_RADIO_BUTTON + i){
-						shortcutKeyValidCh = i;
+						sd.shortcutKeyValidCh = i;
 						break;
 					}
 				}
@@ -339,6 +353,7 @@ BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
 
 	switch(uMsg){
 		case WM_INITDIALOG:{
+			isDlgAlive = TRUE;
 			HINSTANCE hInstance = HINSTANCE(GetWindowLongPtr(hwndDlg, GWLP_HINSTANCE));
 			for(int id = IDC_SHORTCUTKEY_DLG_EDIT_UP1; id <= IDC_SHORTCUTKEY_DLG_EDIT_UP3; ++id){
 				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Initialize(
@@ -346,7 +361,7 @@ BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
 					init_x + (edit_width + offset_x) * (id - IDC_SHORTCUTKEY_DLG_EDIT_UP1), init_y, edit_width, edit_height, id
 				);
 				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Create();
-				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].SetVK(vkArray[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1]);
+				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].SetVK(sd.vkArray[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1]);
 			}
 			for(int id = IDC_SHORTCUTKEY_DLG_EDIT_DOWN1; id <= IDC_SHORTCUTKEY_DLG_EDIT_DOWN3; ++id){
 				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Initialize(
@@ -354,7 +369,7 @@ BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
 					init_x + (edit_width + offset_x) * (id - IDC_SHORTCUTKEY_DLG_EDIT_DOWN1), init_y + offset_y, edit_width, edit_height, id
 				);
 				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].Create();
-				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].SetVK(vkArray[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1]);
+				edt[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1].SetVK(sd.vkArray[id - IDC_SHORTCUTKEY_DLG_EDIT_UP1]);
 			}
 			return TRUE;
 		}
@@ -365,16 +380,17 @@ BOOL CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam){
 		case WM_COMMAND:{
 			if(LOWORD(wParam) == IDC_SHORTCUTKEY_DLG_OK){
 				EndDialog(hwndDlg, IDOK);
-				std::int32_t shortcutKey[IDC_SHORTCUTKEY_DLG_EDIT_DOWN3 - IDC_SHORTCUTKEY_DLG_EDIT_UP1 + 1];
-				for(std::size_t i = 0; i < std::size(shortcutKey); ++i){
+				for(std::size_t i = 0; i < std::size(sd.vkArray); ++i){
 					int vk;
-					if(edt[i].GetVK(vk)) shortcutKey[i] = vk;
-					else shortcutKey[i] = NULL;
+					if(edt[i].GetVK(vk)) sd.vkArray[i] = vk;
+					else sd.vkArray[i] = NULL;
 				}
-				WriteShortcutKey(shortcutKey, std::size(shortcutKey));
+				WriteShortcutKey(sd);
+				isDlgAlive = FALSE;
 				return TRUE;
 			}else if(LOWORD(wParam) == IDC_SHORTCUTKEY_DLG_CANCEL){
 				EndDialog(hwndDlg, IDCANCEL);
+				isDlgAlive = FALSE;
 				return TRUE;
 			}
 		}
