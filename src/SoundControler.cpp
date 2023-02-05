@@ -6,11 +6,6 @@
 #include<Functiondiscoverykeys_devpkey.h>
 #include<propvarutil.h>
 
-/*
-ショートカットキーにどれを使用するか選択させる機能
-*/
-
-
 SoundControler::SoundControler(): m_ChannelCnt(0){
     CComPtr<IMMDeviceEnumerator> pMMDeviceEnu;
     CComPtr<IMMDeviceCollection> pMMDeviceCollection;
