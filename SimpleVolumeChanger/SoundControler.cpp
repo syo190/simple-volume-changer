@@ -1,18 +1,10 @@
-﻿#ifndef UNICODE
-#define UNICODE
-#endif
-
-#include"..\inc\SoundControler.h"
-#include<Functiondiscoverykeys_devpkey.h>
-#include<propvarutil.h>
-
-/*
-ショートカットキーにどれを使用するか選択させる機能
-*/
-
+﻿#include "pch.h"
+#include "SoundControler.h"
+#include <Functiondiscoverykeys_devpkey.h>
+#include <propvarutil.h>
+#pragma comment(lib, "Propsys.lib")
 
 SoundControler::SoundControler(): m_ChannelCnt(0){
-    CComPtr<IMMDeviceEnumerator> pMMDeviceEnu;
     CComPtr<IMMDeviceCollection> pMMDeviceCollection;
     auto result = CoInitializeEx(NULL, COINIT::COINIT_MULTITHREADED);
     result = CoCreateInstance(
@@ -20,20 +12,20 @@ SoundControler::SoundControler(): m_ChannelCnt(0){
         NULL,
         CLSCTX_INPROC_SERVER,
         __uuidof(IMMDeviceEnumerator),
-        (void**)(&pMMDeviceEnu)
+        (void**)(&m_pMMDeviceEnu)
     );
-    result = pMMDeviceEnu->EnumAudioEndpoints(
+    result = m_pMMDeviceEnu->EnumAudioEndpoints(
         EDataFlow::eRender,
         DEVICE_STATE_ACTIVE,
         &pMMDeviceCollection
     );
-    
+
     result = pMMDeviceCollection->GetCount(&this->m_ChannelCnt);
     this->m_aepVolume.resize(this->m_ChannelCnt);
     this->m_DeviceInfo.resize(this->m_ChannelCnt);
     for(std::size_t i = 0; i < this->m_ChannelCnt; ++i){
         CComPtr<IMMDevice> pMMDevice;
-        result = pMMDeviceCollection->Item(i, &pMMDevice);
+        result = pMMDeviceCollection->Item(static_cast<UINT>(i), &pMMDevice);
         result = pMMDevice->Activate(
             __uuidof(IAudioEndpointVolume),
             CLSCTX_INPROC_SERVER,
@@ -53,7 +45,7 @@ SoundControler::~SoundControler(){
 }
 
 // 成功すればTRUE, 失敗すればFALSEを返す
-BOOL SoundControler::SetChannelVolume(float normalizedVol, UINT ch){
+BOOL SoundControler::SetChannelVolume(float normalizedVol, std::size_t ch){
     if(ch >= this->ChannelCount()) return FALSE;
 
     static const float Delta = 1e-10f;
@@ -75,15 +67,31 @@ float SoundControler::GetChannelNormalizedVolume(UINT ch) const{
 
 // デバイスの名前を返す。存在しないchの場合は空文字を返す
 CString SoundControler::DeviceName(UINT ch) const{
-    if(ch >= this->ChannelCount()) return CString(L"");
+    if(ch >= this->ChannelCount()) return _T("");
     
-    static const int BufSize = 256;
-    TCHAR deviceName[BufSize] = {0};
-    auto result = PropVariantToString(this->m_DeviceInfo[ch], deviceName, BufSize);
-    return CString(deviceName);
+    return CString(this->m_DeviceInfo[ch].pwszVal);
 }
 
 // ch数を返す
 UINT SoundControler::ChannelCount() const{
     return this->m_ChannelCnt;
+}
+
+// 現在の出力チャネルを返す
+UINT SoundControler::GetCurrentCannek() const {
+    CComPtr<IMMDevice> device;
+    auto a = m_pMMDeviceEnu->GetDefaultAudioEndpoint(EDataFlow::eRender, ERole::eMultimedia, &device);
+    CComPtr<IPropertyStore> propertyStore;
+    device->OpenPropertyStore(STGM_READ, &propertyStore);
+    PROPVARIANT p;
+    PropVariantInit(&p);
+    propertyStore->GetValue(PKEY_Device_FriendlyName, &p);
+
+    for (std::size_t i = 0; i < m_DeviceInfo.size(); ++i) {
+        if (_tcsicmp(m_DeviceInfo[i].pwszVal, p.pwszVal) == 0) {
+            return static_cast<UINT>(i);
+        }
+    }
+
+    return 0;
 }
