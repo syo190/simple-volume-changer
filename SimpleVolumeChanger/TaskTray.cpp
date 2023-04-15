@@ -1,5 +1,5 @@
-#include"..\inc\TaskTray.h"
-#include<atlstr.h>
+#include "pch.h"
+#include "TaskTray.h"
 
 namespace{
     LRESULT CALLBACK DummyWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
@@ -20,6 +20,9 @@ namespace{
 TaskTray::TaskTray(){
     this->m_receiver = NULL;
     this->m_hiddenWindow = NULL;
+    this->m_callBackMsg = NULL;
+    this->m_hIcon = NULL;
+    this->m_id = NULL;
     this->m_isAlive = false;
 }
 
@@ -47,7 +50,7 @@ BOOL TaskTray::Initialize(HINSTANCE hInstance, HWND hwnd, UINT nID, UINT callBac
     this->m_hIcon = hIcon;
 
     CString className;
-    className.Format("hidden window [%d]", this->m_id);
+    className.Format(_T("hidden window [%d]"), this->m_id);
 
 	WNDCLASS wndC = {};
 	wndC.hInstance = hInstance;

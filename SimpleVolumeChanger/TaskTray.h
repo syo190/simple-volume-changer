@@ -1,18 +1,18 @@
+#pragma once
 #ifndef TaskTray_HEADER_
 #define TaskTray_HEADER_
-#include<windows.h>
-#include<atlbase.h>
+#include <afxwin.h>
 
 /*
-コンストラクタもしくはInitializeで初期化をすること。
-引数の無いコンストラクタでは初期化を行いません。
+�R���X�g���N�^��������Initialize�ŏ����������邱�ƁB
+�����̖����R���X�g���N�^�ł͏��������s���܂���B
 
-初期化を完了したらCreate関数でタスクバー通知領域に追加されます。
-Desroy関数でタスクバー通知領域から削除されます。
+������������������Create�֐��Ń^�X�N�o�[�ʒm�̈�ɒǉ�����܂��B
+Desroy�֐��Ń^�X�N�o�[�ʒm�̈悩��폜����܂��B
 
-デストラクタでリソースは自動解放されます。
+�f�X�g���N�^�Ń��\�[�X�͎����������܂��B
 */
-class TaskTray{
+class TaskTray {
     HWND m_receiver;
     HWND m_hiddenWindow;
     HICON m_hIcon;
