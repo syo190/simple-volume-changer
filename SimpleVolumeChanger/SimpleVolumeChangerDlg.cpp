@@ -177,6 +177,9 @@ BOOL CSimpleVolumeChangerDlg::OnInitDialog()
 	m_pMenu->AppendMenu(MF_ENABLED | MF_STRING, IDD_MENU_SETTING, _T("設定"));
 	SetMenu(m_pMenu);
 
+	// 最小化した状態で開始
+	PostMessage(WM_SYSCOMMAND, SC_MINIMIZE, 0);
+
 	return TRUE;  // フォーカスをコントロールに設定した場合を除き、TRUE を返します。
 }
 
